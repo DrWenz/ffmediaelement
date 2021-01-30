@@ -142,6 +142,21 @@
             return false;
         }).ConfigureAwait(true);
 
+        /// <summary>
+        /// Changes the currently Videostream to another available Videostream from <see cref="MediaInfo.Streams"/>.
+        /// </summary>
+        /// <param name="index">Stream index.</param>
+        public void ChangeStreamIndex(int index)
+        {
+            if(index > MediaInfo.Streams.Count - 1)
+                return;
+            if(index == MediaCore.MediaOptions.VideoStream.StreamIndex)
+                return; // identical stream -> nothing to do
+
+            // change the stream an request a media change to apply the changed stream
+            MediaCore.MediaOptions.VideoStream = MediaInfo.Streams[index];
+            MediaCore.ChangeMedia();
+        }
         #endregion
 
         /// <inheritdoc />

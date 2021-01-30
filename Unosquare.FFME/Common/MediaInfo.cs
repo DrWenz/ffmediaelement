@@ -4,6 +4,7 @@
     using FFmpeg.AutoGen;
     using System;
     using System.Collections.Generic;
+    using System.Collections.ObjectModel;
     using System.Linq;
 
     /// <summary>
@@ -33,8 +34,43 @@
             Chapters = ExtractChapters(ic);
             Programs = ExtractPrograms(ic, Streams);
             BestStreams = FindBestStreams(ic, Streams);
+            BestVideoStreams = CalculateBestVideoStreams();
         }
 
+        #endregion
+
+        #region Calculate VideoStreams
+        private IReadOnlyDictionary<int, StreamInfo> CalculateBestVideoStreams()
+        {
+            Dictionary<int, StreamInfo> videoStreams = new Dictionary<int, StreamInfo>();
+            if(Streams != null && Streams.Count > 0)
+            {
+                foreach(var item in Streams)
+                {
+                    if(item.Value.HasVideo)
+                    {
+                        bool handled = false;
+                        foreach(var exisitngStream in videoStreams)
+                            {
+                            if(item.Value.PixelWidth == exisitngStream.Value.PixelWidth &&
+                                item.Value.PixelHeight == exisitngStream.Value.PixelHeight)
+                            {
+                                if(item.Value.VariantBitRate < exisitngStream.Value.VariantBitRate)
+                                    videoStreams[exisitngStream.Key] = item.Value;
+                                handled = true;
+                                break;
+                            }
+                        }
+
+                        if(!handled)
+                            videoStreams.Add(item.Key, item.Value);
+                    }
+                }
+
+            }
+
+            return new ReadOnlyDictionary<int, StreamInfo>(videoStreams);
+        }
         #endregion
 
         #region Properties
@@ -95,6 +131,10 @@
         /// </summary>
         public IReadOnlyDictionary<AVMediaType, StreamInfo> BestStreams { get; }
 
+        /// <summary>
+        /// Gets the dictionary of video stream information components by stream index.
+        /// </summary>
+        public IReadOnlyDictionary<int, StreamInfo> BestVideoStreams { get; }
         #endregion
 
         #region Methods
@@ -411,6 +451,11 @@
         public int PixelHeight { get; internal set; }
 
         /// <summary>
+        /// Indicator if the stream has video data.
+        /// </summary>
+        public bool HasVideo => PixelWidth > 0 && PixelHeight > 0;
+
+        /// <summary>
         /// Gets the field order. This is useful to determine
         /// if the video needs de-interlacing.
         /// </summary>
@@ -533,6 +578,9 @@
         public string Language => Metadata.ContainsKey("language") ?
             Metadata["language"] : string.Empty;
 
+        public Int64 VariantBitRate => Metadata.ContainsKey("variant_bitrate") ?
+            Convert.ToInt64(Metadata["variant_bitrate"]) : 0;
+
         /// <summary>
         /// Gets a value indicating whether the stream contains data that is not considered to be
         /// audio, video, or subtitles.
@@ -541,6 +589,17 @@
             CodecType == AVMediaType.AVMEDIA_TYPE_DATA ||
             CodecType == AVMediaType.AVMEDIA_TYPE_ATTACHMENT ||
             CodecType == AVMediaType.AVMEDIA_TYPE_UNKNOWN;
+
+        public override string ToString() {
+            return string.Format("{0}: {1}x{2}, FPS: {3}, BitRate: {4}, MaxBitRate: {5}, Metadata: {6}",
+                StreamIndex,
+                PixelWidth,
+                PixelHeight,
+                FPS,
+                BitRate,
+                MaxBitRate,
+                String.Join(",", Metadata));
+        }
     }
 
     /// <summary>
